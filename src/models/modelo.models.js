@@ -1,7 +1,16 @@
 const pool = require('../config/db');
 
 exports.getAll = async () => {
-    const result = await pool.query('SELECT * FROM modelos');
+    const result = await pool.query(`
+    SELECT
+      mo.id_modelo,
+      mo.id_marca,
+      m.nombre AS marca,
+      mo.nombre,
+      mo.descripcion
+    FROM modelos mo
+    JOIN marcas m ON mo.id_marca = m.id_marca
+  `);
     return result.rows;
 };
 

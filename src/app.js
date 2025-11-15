@@ -8,10 +8,15 @@ const vehiculoRoutes = require('./routes/vehiculo.routes');
 const marcaRoutes = require('./routes/marca.routes');
 const modeloRoutes = require('./routes/modelos.routes');
 const cotizacionRoutes = require('./routes/cotizacion.routes');
+const facturaRoutes = require('./routes/factura.routes');
+const tarjetaRoutes = require('./routes/tarjeta.routes');
+const citaRoutes = require('./routes/cita.routes');
+const oficinaRoutes = require('./routes/oficina.routes');
+
 
 const app = express();
 app.use(cors({
-  origin: ['http://localhost:4200'],
+  origin: ['http://localhost:4200', 'http://localhost:3001'],
   credentials: true
 }));
 
@@ -22,6 +27,10 @@ app.use('/api/vehiculos', vehiculoRoutes);
 app.use('/api/marcas', marcaRoutes);
 app.use('/api/modelos', modeloRoutes);
 app.use('/api/cotizaciones', cotizacionRoutes);
+app.use('/api/facturas', facturaRoutes);
+app.use('/api/tarjetas', tarjetaRoutes);
+app.use('/api/citas', citaRoutes);
+app.use('/api/oficinas', oficinaRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -14,6 +14,8 @@ exports.findById = async (id_usuario) => {
 
 // Obtener usuario por correo (requiere JOIN con persona)
 exports.findByCorreo = async (correo) => {
+  if (typeof correo !== 'string') return null;
+
   const correoNormalizado = correo.trim().toLowerCase();
   const result = await pool.query(
     `SELECT * FROM usuario WHERE correo = $1 LIMIT 1`,

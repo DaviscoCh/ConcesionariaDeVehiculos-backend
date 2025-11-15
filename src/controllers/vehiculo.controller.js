@@ -20,19 +20,69 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
     try {
-        const vehiculo = await Vehiculo.create(req.body);
+        const {
+            id_modelo,
+            anio,
+            color,
+            precio,
+            tipo,
+            estado,
+            descripcion,
+            fecha_ingreso,
+            imagen_url
+        } = req.body;
+
+        const vehiculo = await Vehiculo.create({
+            id_modelo, // 👈 mapeo correcto
+            anio: parseInt(anio),
+            color,
+            precio: parseFloat(precio),
+            tipo,
+            estado,
+            descripcion,
+            fecha_ingreso,
+            imagen_url
+        });
+
         res.status(201).json(vehiculo);
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        console.error('Error en backend (POST):', error);
+        res.status(400).json({ error: error.message, detalle: error.stack });
     }
 };
 
 exports.update = async (req, res) => {
     try {
-        const vehiculo = await Vehiculo.update(req.params.id, req.body);
+        const {
+            id_modelo,
+            anio,
+            color,
+            precio,
+            tipo,
+            estado,
+            descripcion,
+            fecha_ingreso,
+            imagen_url
+        } = req.body;
+
+        const vehiculo = await Vehiculo.update(req.params.id, {
+            id_modelo, // 👈 mapeo correcto
+            anio: parseInt(anio),
+            color,
+            precio: parseFloat(precio),
+            tipo,
+            estado,
+            descripcion,
+            fecha_ingreso,
+            imagen_url
+        });
+        console.log('PUT recibido en backend');
+        console.log('ID:', req.params.id);
+        console.log('Body:', req.body);
         res.json(vehiculo);
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        console.error('Error en backend (PUT):', error);
+        res.status(400).json({ error: error.message, detalle: error.stack });
     }
 };
 
