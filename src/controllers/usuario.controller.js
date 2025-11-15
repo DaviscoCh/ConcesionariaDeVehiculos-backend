@@ -30,7 +30,18 @@ exports.login = async (req, res) => {
         console.log('Datos recibidos en login:', req.body);
         const resultado = await loginUsuario(req.body);
         console.log('Resultado del login:', resultado);
-        res.status(200).json(resultado);
+
+        // ✅ Aseguramos que el frontend reciba id_usuario
+        res.status(200).json({
+            token: resultado.token,
+            rol: resultado.rol,
+            usuario: {
+                id_usuario: resultado.usuario.id_usuario, // ✅ este campo es clave
+                nombres: resultado.usuario.nombres,
+                apellidos: resultado.usuario.apellidos,
+                correo: resultado.usuario.correo
+            }
+        });
     } catch (error) {
         console.error('Error en login:', error);
         res.status(401).json({ error: error.message });
@@ -39,7 +50,7 @@ exports.login = async (req, res) => {
 
 exports.getPerfil = async (req, res) => {
     try {
-        const { correo } = req.user;
+        const { correo } = req.usuario; // ✅
         const usuario = await Usuario.findByCorreo(correo);
 
         if (!usuario) {

@@ -11,7 +11,7 @@ function authMiddleware(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // Ahora puedes acceder a req.user.id_usuario, req.user.correo, etc.
+        req.usuario = decoded; // contiene id_usuario y rol
         next();
     } catch (err) {
         console.error('❌ Error al validar token:', err.message);
@@ -19,4 +19,15 @@ function authMiddleware(req, res, next) {
     }
 }
 
-module.exports = authMiddleware;
+function adminOnly(req, res, next) {
+    const usuario = req.usuario;
+    if (!usuario || usuario.rol !== 'admin') {
+        return res.status(403).json({ message: 'Acceso denegado: solo administradores' });
+    }
+    next();
+}
+
+module.exports = {
+    authMiddleware,
+    adminOnly
+};

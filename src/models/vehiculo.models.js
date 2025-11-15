@@ -25,16 +25,15 @@ exports.create = async ({
     estado,
     descripcion,
     fecha_ingreso,
-    imagen_url,
-    stock
+    imagen_url
 }) => {
     const result = await pool.query(
         `INSERT INTO vehiculos (
       id_modelo, anio, color, precio, tipo, estado,
-      descripcion, fecha_ingreso, imagen_url, stock
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      descripcion, fecha_ingreso, imagen_url
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *`,
-        [id_modelo, anio, color, precio, tipo, estado, descripcion, fecha_ingreso, imagen_url, stock]
+        [id_modelo, anio, color, precio, tipo, estado, descripcion, fecha_ingreso, imagen_url]
     );
     return result.rows[0];
 };
@@ -51,8 +50,7 @@ exports.update = async (
         estado,
         descripcion,
         fecha_ingreso,
-        imagen_url,
-        stock
+        imagen_url
     }
 ) => {
     const result = await pool.query(
@@ -65,11 +63,10 @@ exports.update = async (
       estado = $6,
       descripcion = $7,
       fecha_ingreso = $8,
-      imagen_url = $9,
-      stock = $10
-    WHERE id_vehiculo = $11
+      imagen_url = $9
+    WHERE id_vehiculo = $10
     RETURNING *`,
-        [id_modelo, anio, color, precio, tipo, estado, descripcion, fecha_ingreso, imagen_url, stock, id_vehiculo]
+        [id_modelo, anio, color, precio, tipo, estado, descripcion, fecha_ingreso, imagen_url, id_vehiculo]
     );
     return result.rows[0];
 };
