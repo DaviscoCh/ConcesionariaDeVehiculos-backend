@@ -9,6 +9,48 @@ exports.getAll = async (req, res) => {
     }
 };
 
+exports.getAllAdmin = async (req, res) => {
+    try {
+        const citas = await Cita.getAllAdmin();
+        const ahora = new Date();
+
+        for (const cita of citas) {
+            const fechaHora = new Date(`${cita.fecha}T${cita.hora}`);
+
+            if (cita.estado === 'Pendiente' && fechaHora < ahora) {
+                await Cita.actualizarEstado(cita.id_cita, 'Cancelada');
+                cita.estado = 'Cancelada'; // reflejar el cambio en la respuesta
+            }
+        }
+
+        res.json(citas);
+    } catch (error) {
+        console.error("ERROR en getAllAdmin:", error);
+        res.status(500).json({ message: 'Error al obtener las citas', error });
+    }
+};
+
+exports.cambiarEstado = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estado } = req.body;
+
+        const estadosPermitidos = ['Pendiente', 'Confirmada', 'Atendida', 'Cancelada'];
+
+        if (!estadosPermitidos.includes(estado)) {
+            return res.status(400).json({ error: 'Estado inválido' });
+        }
+
+        const cita = await Cita.actualizarEstado(id, estado);
+
+        res.json({ message: 'Estado actualizado correctamente', cita });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al cambiar el estado' });
+    }
+};
+
+
 exports.create = async (req, res) => {
     try {
         console.log('Cita recibida:', req.body); // ✅ Mueve esto arriba
@@ -69,8 +111,20 @@ exports.obtenerHorasOcupadas = async (req, res) => {
 
 exports.getHistorialByUsuario = async (req, res) => {
     try {
-        const { id_usuario } = req.user; // asegúrate de que el middleware de autenticación lo inyecta
+        const { id_usuario } = req.usuario;
+        // asegúrate de que el middleware de autenticación lo inyecta
         const citas = await Cita.getAllByUsuario(id_usuario);
+        const ahora = new Date();
+
+        for (const cita of citas) {
+            const fechaHora = new Date(`${cita.fecha}T${cita.hora}`);
+
+            if (cita.estado === 'Pendiente' && fechaHora < ahora) {
+                await Cita.actualizarEstado(cita.id_cita, 'Cancelada');
+                cita.estado = 'Cancelada';
+            }
+        }
+
         res.json(citas);
     } catch (error) {
         console.error('Error al obtener historial de citas:', error);
