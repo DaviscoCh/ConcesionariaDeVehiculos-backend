@@ -70,6 +70,7 @@ exports.loginUsuario = async ({ correo, password }) => {
     const token = jwt.sign({
         id_usuario: usuario.id_usuario,
         rol: usuario.rol,
+        rol: rol,
         correo: usuario.correo // ✅ esto es lo que falta
     }, process.env.JWT_SECRET, { expiresIn: '2h' });
 
