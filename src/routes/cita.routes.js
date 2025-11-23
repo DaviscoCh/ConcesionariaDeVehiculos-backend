@@ -10,9 +10,13 @@ router.get('/admin/all', citaController.getAllAdmin);
 router.get('/disponibilidad', citaController.verificarDisponibilidad);
 router.get('/horas-ocupadas', citaController.obtenerHorasOcupadas);
 router.get('/historial', authMiddleware, citaController.getHistorialByUsuario);
+
+// ✅ NUEVO: Endpoint para obtener el mejor horario disponible (autocompletado)
+router.get('/mejor-horario', citaController.obtenerMejorHorarioDisponible);
+
 router.post('/', citaController.create);
 router.put('/:id', citaController.update);
-router.patch("/:id/estado", citaController.cambiarEstado); 
+router.patch("/:id/estado", citaController.cambiarEstado);
 router.delete('/:id', citaController.remove);
 
 module.exports = router;

@@ -1,4 +1,6 @@
 const Cita = require('../models/cita.models');
+const Horario = require('../models/horarios.models');
+const pool = require("../config/db"); // ✅ Cambiar nombre a 'pool'
 
 exports.getAll = async (req, res) => {
     try {
@@ -19,7 +21,7 @@ exports.getAllAdmin = async (req, res) => {
 
             if (cita.estado === 'Pendiente' && fechaHora < ahora) {
                 await Cita.actualizarEstado(cita.id_cita, 'Cancelada');
-                cita.estado = 'Cancelada'; // reflejar el cambio en la respuesta
+                cita.estado = 'Cancelada';
             }
         }
 
@@ -44,20 +46,81 @@ exports.cambiarEstado = async (req, res) => {
         const cita = await Cita.actualizarEstado(id, estado);
 
         res.json({ message: 'Estado actualizado correctamente', cita });
+
+        if (estado === 'Cancelada') {
+            await Horario.marcarLibre({
+                fecha: cita.fecha,
+                hora: cita.hora,
+                id_oficina: cita.id_oficina
+            });
+        }
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Error al cambiar el estado' });
     }
 };
 
-
 exports.create = async (req, res) => {
     try {
-        console.log('Cita recibida:', req.body); // ✅ Mueve esto arriba
+        console.log('📝 Cita recibida:', req.body);
         const { id_usuario, id_vehiculo, id_oficina, fecha, hora, comentario } = req.body;
-        const nuevaCita = await Cita.create({ id_usuario, id_vehiculo, id_oficina, fecha, hora, comentario });
+
+        // Normalizar fecha (extraer solo YYYY-MM-DD)
+        const fechaNormalizada = fecha.includes('T') ? fecha.split('T')[0] : fecha;
+
+        // Normalizar hora (eliminar segundos si vienen)
+        const horaNormalizada = hora.includes(':') ? hora.substring(0, 5) : hora;
+
+        console.log('🔍 Verificando horario:', {
+            id_oficina,
+            fecha: fechaNormalizada,
+            hora: horaNormalizada
+        });
+
+        // Verificar que el horario esté disponible
+        const horarioEstado = await Horario.verificarEstado({
+            id_oficina,
+            fecha: fechaNormalizada,
+            hora: horaNormalizada
+        });
+
+        console.log('📊 Estado del horario:', horarioEstado);
+
+        if (!horarioEstado) {
+            return res.status(400).json({
+                error: 'El horario no existe en el sistema'
+            });
+        }
+
+        if (horarioEstado.estado !== 'disponible') {  // ✅ minúscula
+            return res.status(400).json({
+                error: 'El horario seleccionado ya está reservado',
+                estadoActual: horarioEstado.estado
+            });
+        }
+
+        // Crear la cita con fecha normalizada
+        const nuevaCita = await Cita.create({
+            id_usuario,
+            id_vehiculo,
+            id_oficina,
+            fecha: fechaNormalizada,
+            hora: horaNormalizada,
+            comentario
+        });
+
+        // Marcar el horario como reservado
+        await Horario.marcarOcupado({
+            id_oficina,
+            fecha: fechaNormalizada,
+            hora: horaNormalizada
+        });
+
+        console.log('✅ Cita creada exitosamente:', nuevaCita.id_cita);
         res.status(201).json(nuevaCita);
     } catch (error) {
+        console.error('❌ Error al crear cita:', error);
         res.status(400).json({ error: error.message });
     }
 };
@@ -81,17 +144,65 @@ exports.remove = async (req, res) => {
     }
 };
 
-exports.verificarDisponibilidad = async (req, res) => {
+// ---------------------------------------------
+//  NUEVO: OBTENER EL MEJOR HORARIO DISPONIBLE
+//  (Para autocompletar en el frontend)
+// ---------------------------------------------
+exports.obtenerMejorHorarioDisponible = async (req, res) => {
     try {
-        const { fecha, hora, id_oficina } = req.query;
-        if (!fecha || !hora || !id_oficina) {
-            return res.status(400).json({ error: 'Faltan parámetros' });
+        const horario = await Horario.getMejorHorarioDisponible();
+
+        if (!horario) {
+            return res.status(404).json({
+                message: 'No hay horarios disponibles en los próximos días'
+            });
         }
 
-        const disponible = await Cita.verificarDisponibilidad({ fecha, hora, id_oficina });
-        res.json({ disponible });
+        res.json({
+            id_oficina: horario.id_oficina,
+            fecha: horario.fecha,
+            hora: horario.hora,
+            nombre_oficina: horario.nombre_oficina,
+            direccion_oficina: horario.direccion_oficina
+        });
     } catch (error) {
+        console.error('Error al obtener mejor horario:', error);
         res.status(500).json({ error: error.message });
+    }
+};
+
+// Obtener horarios disponibles por fecha y oficina
+exports.verificarDisponibilidad = async (req, res) => {
+    try {
+        const { fecha, id_oficina } = req.query;
+
+        if (!fecha || !id_oficina) {
+            return res.status(400).json({ error: "Faltan parámetros" });
+        }
+
+        // Convertir fecha ISO a formato YYYY-MM-DD si viene con timestamp
+        const fechaFormateada = fecha.includes('T') ? fecha.split('T')[0] : fecha;
+
+        // Obtener horarios disponibles desde la tabla horarios usando PostgreSQL
+        const result = await pool.query(
+            `SELECT hora FROM horarios
+             WHERE fecha = $1 
+               AND id_oficina = $2 
+               AND estado = 'disponible'
+             ORDER BY hora ASC`,
+            [fechaFormateada, id_oficina]
+        );
+
+        const horariosDisponibles = result.rows.map(h => h.hora);
+
+        return res.json({
+            disponible: horariosDisponibles.length > 0,
+            horarios: horariosDisponibles
+        });
+
+    } catch (error) {
+        console.error("Error en verificarDisponibilidad:", error);
+        return res.status(500).json({ error: "Error interno", detalles: error.message });
     }
 };
 
@@ -112,7 +223,6 @@ exports.obtenerHorasOcupadas = async (req, res) => {
 exports.getHistorialByUsuario = async (req, res) => {
     try {
         const { id_usuario } = req.usuario;
-        // asegúrate de que el middleware de autenticación lo inyecta
         const citas = await Cita.getAllByUsuario(id_usuario);
         const ahora = new Date();
 
