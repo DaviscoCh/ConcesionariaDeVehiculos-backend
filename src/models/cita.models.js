@@ -125,3 +125,16 @@ exports.getAllByUsuario = async (id_usuario) => {
     const result = await pool.query(query, [id_usuario]);
     return result.rows;
 };
+
+// ---------------------------------------------
+//  ACTUALIZAR SOLO EL ESTADO DE UNA CITA
+// ---------------------------------------------
+exports.actualizarEstado = async (id_cita, estado) => {
+    const result = await pool.query(
+        `UPDATE citas SET estado = $1
+         WHERE id_cita = $2
+         RETURNING *`,
+        [estado, id_cita]
+    );
+    return result.rows[0];
+};

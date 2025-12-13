@@ -12,7 +12,8 @@ const facturaRoutes = require('./routes/factura.routes');
 const tarjetaRoutes = require('./routes/tarjeta.routes');
 const citaRoutes = require('./routes/cita.routes');
 const oficinaRoutes = require('./routes/oficina.routes');
-
+const notificacionRoutes = require('./routes/notificacion.routes');
+const { iniciarJobCitasVencidas } = require('./jobs/citasJob');
 
 const app = express();
 app.use(cors({
@@ -31,10 +32,12 @@ app.use('/api/facturas', facturaRoutes);
 app.use('/api/tarjetas', tarjetaRoutes);
 app.use('/api/citas', citaRoutes);
 app.use('/api/oficinas', oficinaRoutes);
+app.use('/api/notificaciones', notificacionRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor iniciado en http://localhost:${PORT}`);
+  iniciarJobCitasVencidas();
 });
 
 module.exports = app

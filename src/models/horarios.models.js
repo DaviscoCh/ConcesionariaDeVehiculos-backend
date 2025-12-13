@@ -15,7 +15,7 @@ exports.getOcupados = async ({ fecha, id_oficina }) => {
         `SELECT hora FROM horarios
          WHERE fecha = $1 AND id_oficina = $2
            AND estado = 'reservado'`,
-    [fecha, id_oficina]
+        [fecha, id_oficina]
     );
     return result.rows.map(r => r.hora);
 };
@@ -59,23 +59,46 @@ exports.marcarLibre = async ({ id_oficina, fecha, hora }) => {
 };
 
 // ---------------------------------------------
-//  ENCONTRAR EL MEJOR HORARIO DISPONIBLE (Alternancia CORRECTA)
+//  ENCONTRAR EL MEJOR HORARIO DISPONIBLE (CORREGIDO)
 //  LÓGICA: 
 //  1. Priorizar la fecha más cercana
-//  2. Dentro de esa fecha, la hora más temprana
-//  3. Solo alternar oficinas cuando una hora específica está ocupada
+//  2. Dentro de esa fecha, la hora más temprana disponible
+//  3. Usar zona horaria de Ecuador (America/Guayaquil)
 // ---------------------------------------------
 exports.getMejorHorarioDisponible = async () => {
-    const ahora = new Date();
-    const fechaActual = ahora.toISOString().split('T')[0];
+    // Obtener fecha y hora actual en zona horaria de Ecuador
+    const formatter = new Intl.DateTimeFormat('es-EC', {
+        timeZone: 'America/Guayaquil',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
 
-    // Redondear hora actual al siguiente intervalo
-    const horaActual = new Date(ahora);
-    horaActual.setMinutes(0, 0, 0);
-    if (ahora.getMinutes() > 0) {
-        horaActual.setHours(horaActual.getHours() + 1);
+    const partes = formatter.formatToParts(new Date());
+    const obtenerValor = (tipo) => partes.find(p => p.type === tipo)?.value;
+
+    const año = obtenerValor('year');
+    const mes = obtenerValor('month');
+    const dia = obtenerValor('day');
+    const hora = parseInt(obtenerValor('hour'));
+    const minuto = parseInt(obtenerValor('minute'));
+
+    const fechaActual = `${año}-${mes}-${dia}`;
+
+    // Calcular la PRÓXIMA hora disponible considerando minutos
+    let horaSiguiente = hora;
+    if (minuto > 0) {
+        horaSiguiente += 1;
     }
-    const horaActualStr = horaActual.toTimeString().split(' ')[0].substring(0, 5);
+
+    const horaActualStr = horaSiguiente.toString().padStart(2, '0') + ':00:00';
+
+    console.log(`🕐 Hora actual (Ecuador): ${fechaActual} ${hora}:${minuto}`);
+    console.log(`🕐 Buscando desde: ${fechaActual} ${horaActualStr}`);
 
     const query = `
         SELECT 
@@ -90,8 +113,8 @@ exports.getMejorHorarioDisponible = async () => {
         WHERE 
             h.estado = 'disponible'
             AND (
-                h.fecha > $1 
-                OR (h.fecha = $1 AND h.hora >= $2)
+                TO_TIMESTAMP(h.fecha::text || ' ' || h.hora::text, 'YYYY-MM-DD HH24:MI:SS') 
+                >= TO_TIMESTAMP($1 || ' ' || $2, 'YYYY-MM-DD HH24:MI:SS')
             )
         ORDER BY 
             h.fecha ASC,
@@ -101,6 +124,11 @@ exports.getMejorHorarioDisponible = async () => {
     `;
 
     const result = await pool.query(query, [fechaActual, horaActualStr]);
+
+    if (result.rows[0]) {
+        console.log(`✅ Mejor horario: ${result.rows[0].fecha} ${result.rows[0].hora} - ${result.rows[0].nombre_oficina}`);
+    }
+
     return result.rows[0];
 };
 
