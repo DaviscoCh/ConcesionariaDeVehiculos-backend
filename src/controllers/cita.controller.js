@@ -1,6 +1,7 @@
 const Cita = require('../models/cita.models');
 const Horario = require('../models/horarios.models');
 const Notificacion = require('../models/notificacion.models');
+const Factura = require('../models/factura.models');
 const pool = require("../config/db"); // ✅ Cambiar nombre a 'pool'
 
 exports.getAll = async (req, res) => {
@@ -44,10 +45,60 @@ exports.cambiarEstado = async (req, res) => {
             return res.status(400).json({ error: 'Estado inválido' });
         }
 
+        // Actualizar estado de la cita
         const cita = await Cita.actualizarEstado(id, estado);
 
-        res.json({ message: 'Estado actualizado correctamente', cita });
+        // ========================================
+        // 🆕 GENERAR FACTURA SI ES "ATENDIDA"
+        // ========================================
+        if (estado === 'Atendida') {
+            try {
+                // Verificar si ya existe una factura para esta cita
+                const existeFactura = await Factura.existeFacturaParaCita(id);
 
+                if (!existeFactura) {
+                    // Obtener información completa de la cita para la factura
+                    const queryCitaCompleta = `
+                        SELECT 
+                            c.*,
+                            v.precio
+                        FROM citas c
+                        INNER JOIN vehiculos v ON c.id_vehiculo = v.id_vehiculo
+                        WHERE c.id_cita = $1
+                    `;
+                    const resultCita = await pool.query(queryCitaCompleta, [id]);
+                    const citaCompleta = resultCita.rows[0];
+
+                    // Generar factura automáticamente
+                    const factura = await Factura.generarFacturaDesdeCita({
+                        id_cita: id,
+                        id_usuario: citaCompleta.id_usuario,
+                        id_vehiculo: citaCompleta.id_vehiculo,
+                        precio: citaCompleta.precio
+                    });
+
+                    console.log('✅ Factura generada:', factura.numero_factura);
+
+                    // Crear notificación para el usuario
+                    await Notificacion.crear({
+                        id_usuario: citaCompleta.id_usuario,
+                        id_cita: id,
+                        tipo: 'cita_atendida',
+                        titulo: '✅ Tu cita ha sido atendida',
+                        mensaje: `Tu cita ha sido atendida exitosamente. Factura N° ${factura.numero_factura} generada.`
+                    });
+
+                    console.log('✅ Notificación enviada al usuario');
+                }
+            } catch (facturaError) {
+                console.error('❌ Error al generar factura:', facturaError);
+                // No detenemos el proceso, solo logueamos el error
+            }
+        }
+
+        // ========================================
+        // LIBERAR HORARIO SI ES "CANCELADA"
+        // ========================================
         if (estado === 'Cancelada') {
             await Horario.marcarLibre({
                 fecha: cita.fecha,
@@ -56,8 +107,13 @@ exports.cambiarEstado = async (req, res) => {
             });
         }
 
+        res.json({
+            message: 'Estado actualizado correctamente',
+            cita
+        });
+
     } catch (error) {
-        console.error(error);
+        console.error('❌ Error al cambiar el estado:', error);
         res.status(500).json({ error: 'Error al cambiar el estado' });
     }
 };

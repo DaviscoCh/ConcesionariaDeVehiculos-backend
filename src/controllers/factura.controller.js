@@ -1,37 +1,73 @@
-const FacturaService = require('../services/factura.service');
+const Factura = require('../models/factura.models');
 
-// 🧾 Registrar una compra
-exports.crearFactura = async (req, res) => {
+// ========================================
+//  OBTENER FACTURA POR ID (Para PDF)
+// ========================================
+exports.obtenerFacturaPorId = async (req, res) => {
     try {
-        const id_usuario = req.usuario.id_usuario; // viene del middleware auth.js
-        const { id_vehiculo, precio, metodo_pago, comentario, id_tarjeta } = req.body;
+        const { id } = req.params;
+        const factura = await Factura.obtenerFacturaPorId(id);
 
-        const factura = await FacturaService.registrarCompra({
-            id_usuario,
-            id_vehiculo,
-            precio,
-            metodo_pago,
-            comentario,
-            id_tarjeta
+        if (!factura) {
+            return res.status(404).json({
+                error: 'Factura no encontrada'
+            });
+        }
+
+        res.json({
+            message: 'Factura obtenida exitosamente',
+            data: factura
         });
-
-        res.status(201).json({ mensaje: 'Compra registrada con éxito', factura: factura.factura, saldoRestante: factura.saldoRestante });
     } catch (error) {
-        console.error('Error al registrar factura:', error.message);
-        res.status(400).json({ error: error.message });
+        console.error('Error al obtener factura:', error);
+        res.status(500).json({
+            error: 'Error al obtener la factura'
+        });
     }
 };
 
-// 📜 Obtener historial de compras del usuario
+// ========================================
+//  OBTENER FACTURA POR ID DE CITA
+// ========================================
+exports.obtenerFacturaPorCita = async (req, res) => {
+    try {
+        const { id_cita } = req.params;
+        const factura = await Factura.obtenerFacturaPorCita(id_cita);
+
+        if (!factura) {
+            return res.status(404).json({
+                error: 'No existe factura para esta cita'
+            });
+        }
+
+        res.json({
+            message: 'Factura obtenida exitosamente',
+            data: factura
+        });
+    } catch (error) {
+        console.error('Error al obtener factura:', error);
+        res.status(500).json({
+            error: 'Error al obtener la factura'
+        });
+    }
+};
+
+// ========================================
+//  OBTENER HISTORIAL DE FACTURAS DEL USUARIO
+// ========================================
 exports.obtenerHistorial = async (req, res) => {
     try {
         const id_usuario = req.usuario.id_usuario;
+        const historial = await Factura.obtenerFacturasPorUsuario(id_usuario);
 
-        const historial = await FacturaService.obtenerHistorial(id_usuario);
-
-        res.status(200).json({ historial });
+        res.json({
+            message: 'Historial obtenido exitosamente',
+            data: historial
+        });
     } catch (error) {
-        console.error('Error al obtener historial:', error.message);
-        res.status(500).json({ error: 'Error al obtener historial de compras' });
+        console.error('Error al obtener historial:', error);
+        res.status(500).json({
+            error: 'Error al obtener historial de facturas'
+        });
     }
 };
