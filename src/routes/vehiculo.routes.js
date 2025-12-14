@@ -3,6 +3,7 @@ const router = express.Router();
 const vehiculoController = require('../controllers/vehiculo.controller');
 
 router.get('/', vehiculoController.getAll);
+router.get('/filtrar', vehiculoController.getFiltered);
 router.get('/:id', vehiculoController.getById);
 router.post('/', vehiculoController.create);
 router.put('/:id', vehiculoController.update);

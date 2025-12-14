@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const Cita = require('../models/cita.models');
 const Horario = require('../models/horarios.models');
+const Notificacion = require('../models/notificacion.models');
 
 exports.iniciarJobCitasVencidas = () => {
     cron.schedule('*/2 * * * *', async () => {
@@ -107,7 +108,17 @@ exports.iniciarJobCitasVencidas = () => {
                     });
                     console.log(`   ✅ Horario liberado (aún no pasa)`);
                 }
-
+                try {
+                    await Notificacion.crearParaAdmin({
+                        id_cita: cita.id_cita,
+                        tipo: 'cita_vencida',
+                        titulo: '🔴 Cita cancelada automáticamente',
+                        mensaje: `La cita del ${cita.fecha} a las ${cita.hora} fue cancelada por ausencia del usuario (tolerancia de 20 min superada).`
+                    });
+                    console.log(`   📧 Notificación enviada al admin`);
+                } catch (notifError) {
+                    console.error(`   ⚠️ Error al notificar admin:`, notifError.message);
+                }
                 console.log(`   ✅ Cita cancelada`);
             }
 

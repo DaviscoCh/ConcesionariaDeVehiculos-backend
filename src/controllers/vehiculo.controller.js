@@ -9,6 +9,27 @@ exports.getAll = async (req, res) => {
     }
 };
 
+exports.getFiltered = async (req, res) => {
+    try {
+        const filtros = {
+            marca: req.query.marca,
+            modelo: req.query.modelo,
+            anio: req.query.anio,
+            tipo: req.query.tipo,
+            color: req.query.color,
+            precioMin: req.query.precioMin,
+            precioMax: req.query.precioMax,
+            estado: req.query.estado,
+            busqueda: req.query.busqueda
+        };
+
+        const vehiculos = await Vehiculo.getFiltered(filtros);
+        res.json(vehiculos);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+};
+
 exports.getById = async (req, res) => {
     try {
         const vehiculo = await Vehiculo.getById(req.params.id);

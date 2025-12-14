@@ -1,5 +1,6 @@
 const Cita = require('../models/cita.models');
 const Horario = require('../models/horarios.models');
+const Notificacion = require('../models/notificacion.models');
 const pool = require("../config/db"); // ✅ Cambiar nombre a 'pool'
 
 exports.getAll = async (req, res) => {
@@ -116,6 +117,18 @@ exports.create = async (req, res) => {
             fecha: fechaNormalizada,
             hora: horaNormalizada
         });
+
+        try {
+            await Notificacion.crearParaAdmin({
+                id_cita: nuevaCita.id_cita,
+                tipo: 'nueva_cita',
+                titulo: '📅 Nueva cita agendada',
+                mensaje: `Se ha agendado una nueva cita para el ${fechaNormalizada} a las ${horaNormalizada}`
+            });
+            console.log('✅ Notificación enviada al admin');
+        } catch (notifError) {
+            console.error('⚠️ Error al crear notificación (no crítico):', notifError.message);
+        }
 
         console.log('✅ Cita creada exitosamente:', nuevaCita.id_cita);
         res.status(201).json(nuevaCita);
