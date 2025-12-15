@@ -5,6 +5,14 @@ exports.getAll = async () => {
     return result.rows;
 };
 
+exports.getById = async (id_marca) => {
+    const result = await pool.query(
+        'SELECT * FROM marcas WHERE id_marca = $1',
+        [id_marca]
+    );
+    return result.rows[0];
+};
+
 exports.create = async ({ nombre, descripcion }) => {
     const result = await pool.query(
         'INSERT INTO marcas (nombre, descripcion) VALUES ($1, $2) RETURNING *',

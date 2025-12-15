@@ -9,6 +9,18 @@ exports.getAll = async (req, res) => {
   }
 };
 
+exports.getById = async (req, res) => {
+  try {
+    const marca = await Marca.getById(req.params.id);
+    if (!marca) {
+      return res.status(404).json({ error: 'Marca no encontrada' });
+    }
+    res.json(marca);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+};
+
 exports.create = async (req, res) => {
   try {
     const marca = await Marca.create(req.body);

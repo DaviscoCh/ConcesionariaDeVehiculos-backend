@@ -1,4 +1,5 @@
 const Vehiculo = require('../models/vehiculo.models');
+const pool = require('../config/db');
 
 exports.getAll = async (req, res) => {
     try {
@@ -113,5 +114,29 @@ exports.remove = async (req, res) => {
         res.json(vehiculo);
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+};
+
+// Obtener vehículos por marca
+exports.getByMarca = async (req, res) => {
+    try {
+        const { id_marca } = req.params;
+        const result = await pool.query(
+            `SELECT 
+                v.*,
+                mo.nombre as modelo,
+                ma.nombre as marca,
+                ma.descripcion as marca_descripcion
+             FROM vehiculos v
+             INNER JOIN modelos mo ON v.id_modelo = mo.id_modelo
+             INNER JOIN marcas ma ON mo.id_marca = ma.id_marca
+             WHERE ma.id_marca = $1
+             ORDER BY v.fecha_ingreso DESC`,
+            [id_marca]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error al obtener vehículos por marca:', error);
+        res.status(500).json({ error: 'Error al obtener vehículos' });
     }
 };

@@ -15,6 +15,8 @@ const oficinaRoutes = require('./routes/oficina.routes');
 const notificacionRoutes = require('./routes/notificacion.routes');
 const { iniciarJobCitasVencidas } = require('./jobs/citasJob');
 const favoritoRoutes = require('./routes/favorito.routes');
+const repuestoRoutes = require('./routes/repuesto.routes');
+const compraRepuestoRoutes = require('./routes/compraRepuesto.routes');
 
 const app = express();
 app.use(cors({
@@ -35,6 +37,8 @@ app.use('/api/citas', citaRoutes);
 app.use('/api/oficinas', oficinaRoutes);
 app.use('/api/notificaciones', notificacionRoutes);
 app.use('/api/favoritos', favoritoRoutes);
+app.use('/api/repuestos', repuestoRoutes);
+app.use('/api/compras-repuestos', compraRepuestoRoutes);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
