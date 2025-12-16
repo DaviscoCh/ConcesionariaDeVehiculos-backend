@@ -5,7 +5,10 @@ const { authMiddleware } = require('../middleware/auth');
 
 // Todas las rutas requieren autenticación
 router.get('/historial', authMiddleware, facturaController.obtenerHistorial);
-router.get('/:id', authMiddleware, facturaController.obtenerFacturaPorId);
+router.post('/generar-orden', authMiddleware, facturaController.generarFacturaDesdeOrden);
+router.get('/orden/:id_orden', authMiddleware, facturaController.obtenerFacturaPorOrden);
 router.get('/cita/:id_cita', authMiddleware, facturaController.obtenerFacturaPorCita);
+router.get('/usuario/:id_usuario', authMiddleware, facturaController.obtenerFacturasPorUsuario);
+router.get('/:id', authMiddleware, facturaController.obtenerFacturaPorId);
 
 module.exports = router;

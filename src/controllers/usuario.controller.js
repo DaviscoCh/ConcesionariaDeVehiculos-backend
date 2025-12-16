@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt'); // ⭐ IMPORTANTE
 const { registrarUsuario, loginUsuario } = require('../services/usuario.service');
 const Usuario = require('../models/usuario.models');
 const pool = require('../config/db');

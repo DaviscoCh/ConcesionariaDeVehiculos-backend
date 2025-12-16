@@ -12,4 +12,7 @@ router.get('/', authMiddleware, tarjetaController.obtenerTarjetas);
 // 💰 Recargar saldo
 router.put('/recargar', authMiddleware, tarjetaController.recargarSaldo);
 
+router.delete('/:id', authMiddleware, tarjetaController.eliminarTarjeta);
+
+
 module.exports = router;

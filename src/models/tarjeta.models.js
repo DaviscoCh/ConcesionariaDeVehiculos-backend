@@ -2,37 +2,61 @@ const db = require('../config/db');
 
 // 💳 Crear una nueva tarjeta
 exports.crearTarjeta = async ({ id_usuario, numero, nombre, vencimiento, cvv, tipo }) => {
-    const query = `
+  const query = `
     INSERT INTO tarjetas (id_usuario, numero, nombre, vencimiento, cvv, tipo)
     VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *;
   `;
-    const values = [id_usuario, numero, nombre, vencimiento, cvv, tipo];
-    const result = await db.query(query, values);
-    return result.rows[0];
+  const values = [id_usuario, numero, nombre, vencimiento, cvv, tipo];
+  const result = await db.query(query, values);
+  return result.rows[0];
 };
 
 // 📋 Obtener todas las tarjetas de un usuario
 exports.obtenerTarjetasPorUsuario = async (id_usuario) => {
-    const query = `
+  const query = `
     SELECT id_tarjeta, numero, nombre, vencimiento, tipo, saldo
     FROM tarjetas
     WHERE id_usuario = $1
     ORDER BY vencimiento ASC;
   `;
-    const result = await db.query(query, [id_usuario]);
-    return result.rows;
+  const result = await db.query(query, [id_usuario]);
+  return result.rows;
 };
 
 // 💰 Recargar saldo en una tarjeta
 exports.recargarSaldo = async ({ id_tarjeta, monto }) => {
-    const query = `
+  const query = `
     UPDATE tarjetas
     SET saldo = saldo + $1
     WHERE id_tarjeta = $2
     RETURNING saldo;
   `;
-    const values = [monto, id_tarjeta];
-    const result = await db.query(query, values);
-    return result.rows[0];
+  const values = [monto, id_tarjeta];
+  const result = await db.query(query, values);
+  return result.rows[0];
+};
+
+// 🔍 Obtener tarjeta por ID
+exports.getById = async (id_tarjeta) => {
+  const query = `
+        SELECT id_tarjeta, id_usuario, numero, nombre, vencimiento, tipo, saldo
+        FROM tarjetas
+        WHERE id_tarjeta = $1
+    `;
+  const result = await db.query(query, [id_tarjeta]);
+  return result.rows[0];
+};
+
+// ✏️ Actualizar tarjeta (principalmente para actualizar saldo)
+exports.update = async (id_tarjeta, tarjetaData) => {
+  const { saldo } = tarjetaData;
+  const query = `
+        UPDATE tarjetas
+        SET saldo = $1
+        WHERE id_tarjeta = $2
+        RETURNING *
+    `;
+  const result = await db.query(query, [saldo, id_tarjeta]);
+  return result.rows[0];
 };
