@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const Persona = require('../models/persona.models');
 const Usuario = require('../models/usuario.models');
 const jwt = require('jsonwebtoken');
+const { generarCodigo2FA, enviarCodigo2FA, enviarNotificacionLogin } = require('./email.service');
 
 // ========================================
 // REGISTRAR USUARIO
@@ -41,7 +42,7 @@ exports.registrarUsuario = async (datos) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log('✅ Hash generado:', hashedPassword.substring(0, 20) + '...');
 
-    // 3️⃣ Crear registro en USUARIO
+    // 3️⃣ Crear registro en USUARIO (con 2FA deshabilitado por defecto)
     const usuario = await Usuario.create({
         id_persona: persona.id_persona,
         correo,
@@ -59,7 +60,7 @@ exports.registrarUsuario = async (datos) => {
 };
 
 // ========================================
-// LOGIN USUARIO (Compatible con ambos tipos)
+// LOGIN USUARIO - FASE 1: VALIDAR CREDENCIALES Y ENVIAR CÓDIGO 2FA
 // ========================================
 exports.loginUsuario = async ({ correo, password }) => {
     console.log('🔍 Intentando login para:', correo);
@@ -80,21 +81,18 @@ exports.loginUsuario = async ({ correo, password }) => {
     }
 
     console.log('🔐 Validando contraseña...');
-    console.log('Password ingresado:', password);
-    console.log('Password en BD:', usuario.password.substring(0, 20) + '...');
-    console.log('Longitud password BD:', usuario.password.length);
 
     let isMatch = false;
 
     // ✅ Detectar si la contraseña está hasheada con bcrypt
     if (usuario.password.startsWith('$2b$') || usuario.password.startsWith('$2a$')) {
-        console.log('🔐 Contraseña hasheada detectada - usando bcrypt. compare()');
+        console.log('🔐 Contraseña hasheada detectada - usando bcrypt.compare()');
         isMatch = await bcrypt.compare(password, usuario.password);
     } else {
         console.log('⚠️ Contraseña en texto plano detectada - comparación directa');
         isMatch = (password === usuario.password);
 
-        // 🔄 Opcional: Actualizar a bcrypt después del login exitoso
+        // 🔄 Actualizar a bcrypt después del login exitoso
         if (isMatch) {
             console.log('🔄 Actualizando contraseña a bcrypt...');
             const hashedPassword = await bcrypt.hash(password, 10);
@@ -113,18 +111,93 @@ exports.loginUsuario = async ({ correo, password }) => {
         throw new Error('Credenciales inválidas');
     }
 
-    console.log('✅ Login exitoso');
+    console.log('✅ Credenciales válidas');
+
+    // ========================================
+    // 🔐 FLUJO 2FA
+    // ========================================
+
+    // Generar código 2FA de 6 dígitos
+    const codigo2FA = generarCodigo2FA();
+    console.log('🔑 Código 2FA generado:', codigo2FA);
+
+    // Guardar código en la base de datos (expira en 5 minutos)
+    await Usuario.guardarCodigo2FA(usuario.id_usuario, codigo2FA);
+
+    // Enviar código por correo
+    try {
+        await enviarCodigo2FA(correo, codigo2FA, usuario.nombres);
+        console.log('📧 Código 2FA enviado al correo:', correo);
+    } catch (error) {
+        console.error('❌ Error al enviar código 2FA:', error);
+        throw new Error('Error al enviar código de verificación');
+    }
+
+    // ========================================
+    // RESPUESTA: Indica que se debe verificar el código
+    // ========================================
+    return {
+        requiresTwoFactor: true,
+        message: 'Se ha enviado un código de verificación a tu correo',
+        id_usuario: usuario.id_usuario, // Necesario para la verificación
+        correo: usuario.correo
+    };
+};
+
+// ========================================
+// VERIFICAR CÓDIGO 2FA - FASE 2: COMPLETAR LOGIN
+// ========================================
+exports.verificarCodigo2FA = async ({ id_usuario, codigo }) => {
+    console.log('🔍 Verificando código 2FA para usuario:', id_usuario);
+
+    // Verificar el código
+    const verificacion = await Usuario.verificarCodigo2FA(id_usuario, codigo);
+
+    if (!verificacion.valido) {
+        console.log('❌ Código inválido:', verificacion.mensaje);
+        throw new Error(verificacion.mensaje);
+    }
+
+    console.log('✅ Código 2FA válido');
+
+    // Limpiar código usado
+    await Usuario.limpiarCodigo2FA(id_usuario);
+
+    // Obtener datos del usuario
+    const result = await pool.query(
+        `SELECT u.*, p.nombres, p.apellidos, p.correo
+         FROM usuario u
+         JOIN persona p ON u.id_persona = p.id_persona
+         WHERE u.id_usuario = $1`,
+        [id_usuario]
+    );
+
+    const usuario = result.rows[0];
+
+    if (!usuario) {
+        throw new Error('Usuario no encontrado');
+    }
 
     // Determinar el rol
-    const isAdmin = correo.endsWith('@carpremier.com');
+    const isAdmin = usuario.correo.endsWith('@carpremier.com');
     const rol = isAdmin ? 'admin' : 'cliente';
 
-    // Generar token
+    // Generar token JWT
     const token = jwt.sign({
         id_usuario: usuario.id_usuario,
         rol: rol,
         correo: usuario.correo
     }, process.env.JWT_SECRET, { expiresIn: '2h' });
+
+    // Enviar notificación de login exitoso (opcional)
+    try {
+        await enviarNotificacionLogin(usuario.correo, usuario.nombres);
+    } catch (error) {
+        console.error('⚠️ Error al enviar notificación de login:', error);
+        // No lanzamos error porque no es crítico
+    }
+
+    console.log('✅ Login completado exitosamente');
 
     return {
         token,
@@ -135,6 +208,42 @@ exports.loginUsuario = async ({ correo, password }) => {
             apellidos: usuario.apellidos,
             correo: usuario.correo
         }
+    };
+};
+
+// ========================================
+// REENVIAR CÓDIGO 2FA
+// ========================================
+exports.reenviarCodigo2FA = async (id_usuario) => {
+    console.log('🔄 Reenviando código 2FA para usuario:', id_usuario);
+
+    // Obtener datos del usuario
+    const usuario = await Usuario.findById(id_usuario);
+    if (!usuario) {
+        throw new Error('Usuario no encontrado');
+    }
+
+    // Obtener datos de persona
+    const result = await pool.query(
+        `SELECT p.nombres, p.correo
+         FROM persona p
+         WHERE p.id_persona = $1`,
+        [usuario.id_persona]
+    );
+
+    const persona = result.rows[0];
+
+    // Generar nuevo código
+    const codigo2FA = generarCodigo2FA();
+    await Usuario.guardarCodigo2FA(id_usuario, codigo2FA);
+
+    // Enviar por correo
+    await enviarCodigo2FA(persona.correo, codigo2FA, persona.nombres);
+
+    console.log('✅ Código reenviado exitosamente');
+
+    return {
+        message: 'Código reenviado exitosamente'
     };
 };
 
@@ -150,13 +259,14 @@ exports.getPerfil = async (req, res) => {
                 u.id_usuario,
                 u.correo,
                 u.estado,
-                u. fecha_creacion as usuario_fecha_creacion,
-                p. id_persona,
-                p. nombres,
+                u.fecha_creacion as usuario_fecha_creacion,
+                u.two_factor_enabled,
+                p.id_persona,
+                p.nombres,
                 p.apellidos,
                 p.tipo_documento,
                 p.documento,
-                p. telefono,
+                p.telefono,
                 p.direccion,
                 p.fecha_nacimiento,
                 p.fecha_creacion as persona_fecha_creacion
@@ -183,7 +293,8 @@ exports.getPerfil = async (req, res) => {
             telefono: usuario.telefono,
             direccion: usuario.direccion,
             fecha_nacimiento: usuario.fecha_nacimiento,
-            fecha_creacion: usuario.usuario_fecha_creacion
+            fecha_creacion: usuario.usuario_fecha_creacion,
+            two_factor_enabled: usuario.two_factor_enabled
         });
     } catch (error) {
         console.error('❌ Error al obtener perfil:', error);
