@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { enviarFacturaCita } = require('../services/email.service'); // ✅ AGREGAR AL INICIO
 
 // ========================================
 //  GENERAR FACTURA AUTOMÁTICA DESDE CITA
@@ -21,29 +22,29 @@ exports.generarFacturaDesdeCita = async (citaData) => {
   const total = subtotal + iva;
 
   const query = `
-        INSERT INTO facturas (
-            id_cita,
-            id_usuario, 
-            id_vehiculo, 
-            precio, 
-            subtotal,
-            iva,
-            total,
-            metodo_pago, 
-            estado,
-            numero_factura,
-            fecha,
-            fecha_emision,
-            comentario
-        )
-        VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, 'Pagada', 
-            'FACT-' || nextval('factura_numero_seq'),
-            NOW(), NOW(), 
-            'Factura generada automáticamente por atención de cita'
-        )
-        RETURNING *;
-    `;
+    INSERT INTO facturas (
+        id_cita,
+        id_usuario, 
+        id_vehiculo, 
+        precio, 
+        subtotal,
+        iva,
+        total,
+        metodo_pago, 
+        estado,
+        numero_factura,
+        fecha,
+        fecha_emision,
+        comentario
+    )
+    VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, 'Pagada', 
+        'FACT-' || nextval('factura_numero_seq'),
+        NOW(), NOW(), 
+        'Factura generada automáticamente por atención de cita'
+    )
+    RETURNING *;
+  `;
 
   const values = [
     id_cita,
@@ -57,7 +58,23 @@ exports.generarFacturaDesdeCita = async (citaData) => {
   ];
 
   const result = await pool.query(query, values);
-  return result.rows[0];
+  const factura = result.rows[0];
+
+  // ✅ ENVIAR EMAIL DE FACTURA DE CITA
+  try {
+    // Obtener datos completos con JOIN
+    const facturaCompleta = await exports.obtenerFacturaPorCita(id_cita);
+
+    if (facturaCompleta) {
+      await enviarFacturaCita(facturaCompleta);
+      console.log('📧 Email de factura de cita enviado a:', facturaCompleta.correo);
+    }
+  } catch (emailError) {
+    console.error('⚠️ Error al enviar email de factura (no crítico):', emailError.message);
+    // No lanzamos error porque la factura ya se generó
+  }
+
+  return factura;
 };
 
 // ========================================

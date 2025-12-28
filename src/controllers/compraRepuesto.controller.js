@@ -2,9 +2,10 @@ const CompraRepuesto = require('../models/compraRepuesto.models');
 const Repuesto = require('../models/repuesto.models');
 const Tarjeta = require('../models/tarjeta.models');
 const pool = require('../config/db');
+const { enviarFacturaRepuesto } = require('../services/email.service'); // ✅ IMPORTAR
 
 // ========================================
-//  PROCESAR COMPRA DE REPUESTO
+//  PROCESAR COMPRA DE REPUESTO - CON EMAIL
 // ========================================
 exports.procesarCompra = async (req, res) => {
     const client = await pool.connect();
@@ -100,6 +101,20 @@ exports.procesarCompra = async (req, res) => {
         await client.query('COMMIT');
 
         const compra = compraResult.rows[0];
+
+        // ✅ ENVIAR EMAIL DE FACTURA DE REPUESTO
+        try {
+            // Obtener datos completos de la compra con JOIN
+            const compraCompleta = await CompraRepuesto.getById(compra.id_compra);
+
+            if (compraCompleta) {
+                await enviarFacturaRepuesto(compraCompleta);
+                console.log('📧 Email de factura de repuesto enviado a:', compraCompleta.correo);
+            }
+        } catch (emailError) {
+            console.error('⚠️ Error al enviar email (no crítico):', emailError.message);
+            // No lanzamos error porque la compra ya se procesó exitosamente
+        }
 
         res.status(201).json({
             message: 'Compra realizada exitosamente',
