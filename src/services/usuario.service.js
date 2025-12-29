@@ -122,7 +122,9 @@ exports.loginUsuario = async ({ correo, password }) => {
     console.log('🔑 Código 2FA generado:', codigo2FA);
 
     // Guardar código en la base de datos (expira en 5 minutos)
+    console.log('💾 Intentando guardar código:', { id_usuario: usuario.id_usuario, codigo: codigo2FA });
     await Usuario.guardarCodigo2FA(usuario.id_usuario, codigo2FA);
+    console.log('✅ Código guardado exitosamente');
 
     // Enviar código por correo
     try {
@@ -179,7 +181,8 @@ exports.verificarCodigo2FA = async ({ id_usuario, codigo }) => {
     }
 
     // Determinar el rol
-    const isAdmin = usuario.correo.endsWith('@carpremier.com');
+    const isAdmin = usuario.correo.endsWith('@carpremier.com') ||  // ✅ usuario.correo
+        usuario.correo === 'acarpremier@gmail.com';                 // ✅ usuario.correo
     const rol = isAdmin ? 'admin' : 'cliente';
 
     // Generar token JWT
